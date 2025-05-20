@@ -162,42 +162,41 @@ _M.requirex = requirex
 
 
 -- 扩展命名空间机制
-local Global_NS_Ex = {}
-_M._NS = Global_NS_Ex
+local _NS = {}
+_M._NS = _NS
 
 local global_MT = _G.getmetatable(_G) or {}
 
 
-local insert = _G.table.insert
-
 -- 原来的扩展空间（如果有）
 local original = global_MT.__index
 local t = type(original)
-insert(Global_NS_Ex, 
-t == "table" and original
+_NS[0] = t == "table" and original
 or t == "function" and function(k)
   return original(_G, k)
-end)
+end
 
 -- 已经导入但没有分配全局变量名的模块
-insert(Global_NS_Ex, loaded)
+_NS[1] = loaded
 
 -- 各个模块的环境
-insert(Global_NS_Ex, function(k)
+_NS[2] = function(k)
   local val
   for _, env in next, envs do
     val = get(env, k)
     if val then return val end
   end
-end)
+end
 
+_NS.n = 2
 
 -- 注册新的扩展空间
 local function regns(ns)
   local t = type(ns)
-  ns = (t == "function" or t == "table")
-  and ns or nil
-  return insert(Global_NS_Ex, ns)
+  if t == "function" or t == "table" then
+    _NS.n = _NS.n + 1
+    _NS[_NS.n] = ns
+  end
 end
 
 _M.regns = regns
@@ -205,11 +204,11 @@ _M.regns = regns
 
 function global_MT:__index(k)
   local item
-  for i = 1, #Global_NS_Ex do
-    local f = Global_NS_Ex[i]
+  for i = 0, _NS.n do
+    local f = _NS[i]
     local t = type(f)
     item = t == "function" and f(k)
-    or t == "table" and f[k]
+    or t == "table" and get(f, k)
     if item then return item end
   end
 end
