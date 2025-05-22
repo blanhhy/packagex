@@ -8,6 +8,9 @@ static int char_at(lua_State *L) {
     const char *str = luaL_checklstring(L, 1, &len);
     lua_Integer idx = luaL_checkinteger(L, 2);
 
+    if (idx < 0)
+        idx = (lua_Integer)len + idx + 1;
+
     if (idx < 1 || idx > (lua_Integer)len) {
         lua_pushnil(L);
     } else {
