@@ -6,7 +6,8 @@ local require = require
 local _G = _G or require("_G")
 _M._G = _G
 
-local outdated = (_M.luaver or tonumber(_VERSION:sub(5, -1))) < 5.2
+_M.luaver = _M.luaver or _G.tonumber(_G._VERSION:sub(5, -1))
+local outdated = _M.luaver < 5.2
 local _ENV = _M
 if outdated then setfenv(1, _ENV) end
 
@@ -168,20 +169,25 @@ _M.requirex = requirex
 
 -- 导入模块内的变量到环境
 local function include(name, _env, ...)
-  local pkg = requirex(name, ...)
-
   _env = _env or _G -- 默认导入全局环境
+  local ns
 
-  local ns = envs[name] -- 环境优先
-  if ns then
-    local k1 = next(ns)
-    if not k1 or k1 ~= '__name' or next(ns, k1) then
-      -- 如果环境是只含'__name'键的表，不视为有效
-      local last = name:match("[^.]+$")
-      ns[last] = ns[last] or pkg -- 解决某些即改环境又返回值的模块
-     else ns = pkg
+  if type(name) ~= "table" then
+    local pkg = requirex(name, ...)
+
+    ns = envs[name] -- 环境优先
+    if ns then
+      local k1 = next(ns)
+      if not k1 or k1 ~= '__name' or next(ns, k1) then
+        -- 如果环境是只含'__name'键的表，不视为有效
+        local last = name:match("[^.]+$")
+        ns[last] = ns[last] or pkg -- 解决某些即改环境又返回值的模块
+       else ns = pkg
+      end
+     else ns = pkg -- 返回值备用
     end
-   else ns = pkg -- 返回值备用
+
+   else ns = name
   end
 
   if type(ns) == "table" then -- 处理 table 中的域
@@ -189,8 +195,20 @@ local function include(name, _env, ...)
       ns = ns.__export -- 如果指定了导出组，直接采用
       _env = type(ns[1]) == "table" and ns[1] or _env
     end
+  
+    if type(ns.__exports) == "table" then
+      -- 如果指定了多个导出组
+      local exports = ns.__exports
+      for i = 1, #exports do
+        ns = exports[i]
+        include(ns, type(ns[1]) == "table" and ns[1] or _env)
+      end
+      return
+    end 
+  
     for k, v in next, ns do
-      if k:at(1) ~= '_' -- 不要导入 私有字段
+      if type(k) == "string" -- 不要导入 非字符串
+        and k:at(1) ~= '_' -- 不要导入 私有字段
         and nil == get(_env, k) then -- 防止覆盖原有值
         _env[k] = v
       end
@@ -221,10 +239,7 @@ local function from_import(this, name)
    elseif ntype ~= "string" then return
     _G.error(("invalid argument type '%s'."):format(ntype), 2)
    elseif name == '*' then -- 导入全部
-    for k, v in next, ns do
-      if k:at(1) ~= '_' and nil == get(_G, k)
-        then _G[k] = v end
-    end
+    include(ns, _G)
    elseif name:at(1) ~= '_' and nil == get(_G, k) then
     _G[name] = ns[name]
   end
