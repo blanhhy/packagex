@@ -199,11 +199,12 @@ local function include(name, _env, ...)
     if type(ns.__exports) == "table" then
       -- 如果指定了多个导出组
       local exports = ns.__exports
+      local export
       for i = 1, #exports do
-        ns = exports[i]
-        include(ns, type(ns[1]) == "table" and ns[1] or _env)
+        export = exports[i]
+        include(export, type(export[1]) == "table" and export[1] or _env)
       end
-      return
+      return ns
     end 
   
     for k, v in next, ns do
