@@ -14,6 +14,7 @@ if outdated then setfenv(1, _ENV) end
 local _P = _G.package or require("package")
 local locate = _P.searchpath
 local loaded = _P.loaded
+_P.require = require
 _M.loaded = loaded -- 同步 loaded
 
 local pcall = _G.pcall
@@ -140,7 +141,7 @@ local function requirex(name, env, ...)
 
   local names = {pname}; i = 1
   local function getField(k) return pkg[k] end
-  
+
   for field in name:gmatch((">([^%s]+)"):format(_M.config:at(1))) do
     -- 获取表示成员名的部分
     local ok, item = pcall(getField, field)
@@ -159,61 +160,6 @@ local function requirex(name, env, ...)
 end
 
 _M.requirex = requirex
-
-
--- 扩展命名空间机制
-local _NS = {}
-_M._NS = _NS
-
-local global_MT = _G.getmetatable(_G) or {}
-
-
--- 原来的扩展空间（如果有）
-local original = global_MT.__index
-local t = type(original)
-_NS[0] = t == "table" and original
-or t == "function" and function(k)
-  return original(_G, k)
-end
-
--- 已经导入但没有分配全局变量名的模块
-_NS[1] = loaded
-
--- 各个模块的环境
-_NS[2] = function(k)
-  local val
-  for _, env in next, envs do
-    val = get(env, k)
-    if val then return val end
-  end
-end
-
-_NS.n = 2
-
--- 注册新的扩展空间
-local function regns(ns)
-  local t = type(ns)
-  if t == "function" or t == "table" then
-    _NS.n = _NS.n + 1
-    _NS[_NS.n] = ns
-  end
-end
-
-_M.regns = regns
-
-
-function global_MT:__index(k)
-  local item
-  for i = 0, _NS.n do
-    local f = _NS[i]
-    local t = type(f)
-    item = t == "function" and f(k)
-    or t == "table" and get(f, k)
-    if item then return item end
-  end
-end
-
-setmt(_G, global_MT)
 
 
 
@@ -248,10 +194,11 @@ local function include(name, _env, ...)
         and nil == get(_env, k) then -- 防止覆盖原有值
         _env[k] = v
       end
-    end
+    end return ns
    elseif ns and ns ~= true then -- 处理除 table 之外的有效值
     local k = name:match("[^.]+$")
     if nil == get(_env, k) then _env[k] = ns end
+    return ns
     -- else: 如果用了预导入器或者c api，
     -- 它们的环境不受模块系统控制，所以可能会什么都没有
   end
@@ -311,12 +258,73 @@ end
 _M.from = from
 
 
+
+------- 《全局命名空间扩展》机制 -------
+
+
+local extns = {}
+_M.extns = extns
+
+function extns.init()
+  local _NS = {}
+  extns._NS = _NS
+
+  local global_MT = _G.getmetatable(_G) or {}
+
+  -- 原来的扩展空间（如果有）
+  local original = global_MT.__index
+  local t = type(original)
+  _NS[0] = t == "table" and original
+  or t == "function" and function(k)
+    return original(_G, k)
+  end or nil
+
+  -- 各个模块的环境
+  _NS[1] = function(k)
+    local val
+    for _, env in next, envs do
+      val = get(env, k)
+      if nil ~= val then return val end
+    end
+  end
+
+  -- 已经导入但没有分配全局变量名的模块
+  _NS[2] = loaded
+
+  _NS.n = 2
+
+  -- 注册新的扩展空间
+  local function regns(ns)
+    local t = type(ns)
+    if t == "function" or t == "table" then
+      _NS.n = _NS.n + 1
+      _NS[_NS.n] = ns
+    end
+  end
+
+  extns.regns = regns
+
+  function global_MT:__index(k)
+    local item
+    for i = 0, _NS.n do
+      local f = _NS[i]
+      local t = type(f)
+      if t == "function" then item = f(k)
+       elseif t == "table" then item = get(f, k) end
+      if nil ~= item then return item end
+    end
+  end
+
+  setmt(_G, global_MT)
+end
+
+
 -- 定义导出组
 __export = {
   rawtype = loaded.rawtype,
   requirex = requirex,
   include = include,
-  from = from 
+  from = from
 }
 
 loaded.packagex = _M
@@ -324,10 +332,4 @@ envs.packagex = _ENV
 
 
 -- 处理独立运行情况
-if not _M.init then
-  function init()
-    return include "packagex"
-  end
-end
-
-return _M
+if not _M.init t
