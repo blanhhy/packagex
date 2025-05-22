@@ -262,10 +262,12 @@ _M.from = from
 ------- 《全局命名空间扩展》机制 -------
 
 
-local extns = {}
+local extns = {inited = false}
 _M.extns = extns
 
 function extns.init()
+  if extns.inited then return end
+
   local _NS = {}
   extns._NS = _NS
 
@@ -316,6 +318,7 @@ function extns.init()
   end
 
   setmt(_G, global_MT)
+  extns.inited = true
 end
 
 
@@ -334,7 +337,10 @@ envs.packagex = _ENV
 -- 处理独立运行情况
 if not _M.init then
   function init()
-    return include "packagex"
+    if not inited then
+      inited = true
+      return include "packagex"
+    end
   end
 end
 

@@ -85,10 +85,14 @@ function _M.install()
   installlib "packagex.lib.$o.$a.charat"
 end
 
+_M.inited = false
+
 -- 延迟初始化
 function _M.init()
+  if _M.inited then return end
   refer "packagex" -- 模块主逻辑
   _M.include "packagex"
+  _M.inited = true
 end
 
 return _M
