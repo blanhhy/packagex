@@ -332,4 +332,10 @@ envs.packagex = _ENV
 
 
 -- 处理独立运行情况
-if not _M.init t
+if not _M.init then
+  function init()
+    return include "packagex"
+  end
+end
+
+return _M
