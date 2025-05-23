@@ -194,6 +194,8 @@ local function include(name, _env, ...)
     if type(ns.__export) == "table" then
       ns = ns.__export -- 如果指定了导出组，直接采用
       _env = type(ns[1]) == "table" and ns[1] or _env
+     elseif true == ns.__export then
+      return ns
     end
   
     if type(ns.__exports) == "table" then
@@ -204,6 +206,9 @@ local function include(name, _env, ...)
         export = exports[i]
         include(export, type(export[1]) == "table" and export[1] or _env)
       end
+      ns.__exports = true
+      return ns
+     elseif true == ns.__exports then
       return ns
     end 
   
@@ -213,7 +218,9 @@ local function include(name, _env, ...)
         and nil == get(_env, k) then -- 防止覆盖原有值
         _env[k] = v
       end
-    end return ns
+    end
+    ns.__export = true
+    return ns
    elseif ns and ns ~= true then -- 处理除 table 之外的有效值
     local k = name:match("[^.]+$")
     if nil == get(_env, k) then _env[k] = ns end
