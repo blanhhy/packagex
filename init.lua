@@ -63,15 +63,15 @@ _M.getcpath = getcapth
 local cpath = getcapth()
 _M.cpath = cpath
 
-
-local cp = osenv == "windows" and "copy" or "cp"
+local dir_sep = pconfig:sub(1, 1)
+local cp = dir_sep == "\\" and "copy" or "cp"
 local concat = table.concat
 
 -- 如果可能的话，更建议手动复制文件
 -- installlib 是为那些无法访问安装位置的环境（如 Androlua）准备的
 local function installlib(pname)
   pname = pname:gsub('%$o', osenv):gsub('%$a', arch)
-  local src = concat{prefix, pname:gsub('%.', '/'), libext}
+  local src = concat{prefix, pname:gsub('%.', dir_sep), libext}
   local dest = cpath:gsub(name_repl, pname:match("[^.]+$"))
   os.execute(concat({cp, src, dest}, ' '))
 end
@@ -79,10 +79,18 @@ end
 _M.installlib = installlib
 
 
+local liblist = {
+  "packagex.lib.$o.$a.rawtype",
+  "packagex.lib.$o.$a.charat"
+}
+
+_M.liblist = liblist
+
 -- 安装依赖（手动运行一次即可）
 function _M.install()
-  installlib "packagex.lib.$o.$a.rawtype"
-  installlib "packagex.lib.$o.$a.charat"
+  for i = 1, #liblist do
+    installlib(liblist[i])
+  end
 end
 
 _M.inited = false
